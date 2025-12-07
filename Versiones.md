@@ -6,14 +6,10 @@ from PIL import Image, ImageTk
 from medicos import NexusCare
 from usuarios import Usuario, hash_password
 from citas import Consulta
+from citas import ConsultaPaciente
 
 bib = NexusCare()
-current_user = None  # objeto Usuario autenticado
-
-# --------------------------
-# Funciones de la aplicación
-# --------------------------
-
+current_user = None  #
 
 def login_inicial():
     """Ventana gráfica de login estilo registrar usuario."""
@@ -531,71 +527,298 @@ def modificar_usuario():
 
 @requiere_admin
 def eliminar_usuario():
-        win = tk.Toplevel()
-        win.title("Eliminar usuario")
-        win.geometry("500x300")
-        win.resizable(False, False)
+    win = tk.Toplevel()
+    win.title("Eliminar usuario")
+    win.geometry("450x350")
+    win.resizable(False, False)
 
-        # ======== Cargar imágenes ========
-        img_s1 = Image.open("C:/Users/maryf/OneDrive/Escritorio/Imagenes Tópicos/Nexus_Care_LOGO_SOLO-removebg-preview.png")
-        img_s1 = img_s1.resize((70, 70), Image.Resampling.LANCZOS)
-        img_s1_tk = ImageTk.PhotoImage(img_s1)
+    ttk.Label(win, text="Eliminar usuario", font=("Arial", 12, "bold")).pack(pady=15)
 
-        frame_imgs = ttk.Frame(win)
-        frame_imgs.pack(pady=20)
+    frame = ttk.Frame(win, padding=20)
+    frame.pack()
 
-        ttk.Label(frame_imgs, image=img_s1_tk).pack()
-        win.img1 = img_s1_tk
+    # --- Opción 1: eliminar por ID ---
+    ttk.Label(frame, text="Eliminar por ID:").grid(row=0, column=0, pady=8, sticky="w")
+    entry_id = tk.Entry(frame, width=30)
+    entry_id.grid(row=0, column=1)
 
-        frame = ttk.Frame(win, padding=20)
-        frame.pack()
+    def eliminar_id():
+        try:
+            user_id = int(entry_id.get())
+        except:
+            messagebox.showerror("Error", "El ID debe ser un número entero.")
+            return
 
-        ttk.Label(frame, text="Nombre del usuario a eliminar:").grid(row=0, column=0, padx=5, pady=5)
-        entry_nombre = tk.Entry(frame, width=35, highlightthickness=2, highlightbackground="#5F9BE0")
-        entry_nombre.grid(row=0, column=1, padx=5, pady=5)
+        borrados = Usuario.eliminar_por_id(user_id)
 
-        def eliminar():
-            nombre = entry_nombre.get().strip()
-            if not nombre:
-                messagebox.showwarning("Aviso", "Ingrese un nombre.")
+        if borrados == 0:
+            messagebox.showwarning("Aviso", "No existe un usuario con ese ID.")
+        else:
+            messagebox.showinfo("Éxito", f"Usuario con ID {user_id} eliminado.")
+            listar_usuarios()
+            win.destroy()
+
+    tk.Button(frame, text="Eliminar por ID", bg="#ef5350", fg="white",
+              command=eliminar_id).grid(row=1, column=1, pady=8, sticky="e")
+
+    # --- Opción 2: eliminar por Apellido ---
+    ttk.Label(frame, text="Eliminar por apellido:").grid(row=2, column=0, pady=8, sticky="w")
+    entry_apellido = tk.Entry(frame, width=30)
+    entry_apellido.grid(row=2, column=1)
+
+    def buscar_apellidos():
+        apellido = entry_apellido.get().strip()
+        if not apellido:
+            messagebox.showwarning("Aviso", "Debe ingresar un apellido.")
+            return
+
+        resultados = Usuario.buscar_por_apellido(apellido)
+
+        if not resultados:
+            messagebox.showinfo("Sin resultados", "No se encontraron usuarios con ese apellido.")
+            return
+
+        # Mostrar lista para elegir
+        sel_win = tk.Toplevel()
+        sel_win.title("Seleccionar usuario a eliminar")
+        sel_win.geometry("400x300")
+
+        ttk.Label(sel_win,
+                  text=f"Usuarios con apellido '{apellido}':",
+                  font=("Arial", 11, "bold")).pack(pady=10)
+
+        tree = ttk.Treeview(sel_win, columns=("ID", "Nombre", "Correo"), show="headings")
+        tree.heading("ID", text="ID")
+        tree.heading("Nombre", text="Nombre")
+        tree.heading("Correo", text="Correo")
+        tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for usr in resultados:
+            tree.insert("", "end", values=(usr.id, usr.nombre + " " + usr.apellidos, usr.correo))
+
+        def eliminar_seleccion():
+            item = tree.selection()
+            if not item:
+                messagebox.showwarning("Aviso", "Seleccione un usuario.")
                 return
 
-            usr = Usuario.buscar_por_nombre(nombre)
-            if usr is None:
-                messagebox.showerror("Error", "Usuario no encontrado.")
+            user_id = tree.item(item)["values"][0]
+
+            Usuario.eliminar_por_id(user_id)
+            messagebox.showinfo("Eliminado", f"Usuario con ID {user_id} eliminado.")
+
+            sel_win.destroy()
+            win.destroy()
+            listar_usuarios()
+
+        tk.Button(sel_win, text="Eliminar seleccionado", bg="#ef5350", fg="white",
+                  command=eliminar_seleccion).pack(pady=10)
+
+    tk.Button(frame, text="Buscar y eliminar por apellido", bg="#3a7bd5", fg="white",
+              command=buscar_apellidos).grid(row=3, column=1, pady=8, sticky="e")
+
+    tk.Button(win, text="Cerrar", bg="#999", fg="white",
+              command=win.destroy).pack(pady=10)
+    
+
+@requiere_admin
+def agregar_especialidad():
+    win = tk.Toplevel()
+    win.title("Agregar especialidad")
+    win.geometry("400x250")
+    win.resizable(False, False)
+
+    frame = ttk.Frame(win, padding=20)
+    frame.pack(fill="both", expand=True)
+
+    ttk.Label(frame, text="Nombre de la especialidad:").grid(row=0, column=0, sticky="w", pady=5)
+    entry_nombre = tk.Entry(frame, width=35)
+    entry_nombre.grid(row=0, column=1, pady=5)
+
+    def guardar():
+        nom = entry_nombre.get().strip()
+
+        if not nom:
+            messagebox.showwarning("Falta nombre", "Debes ingresar un nombre para la especialidad.")
+            return
+
+        try:
+            conn = get_conn()
+            c = conn.cursor()
+            c.execute("INSERT INTO especialidades (es_nombre) VALUES (%s)", (nom,))
+            conn.commit()
+            conn.close()
+
+            messagebox.showinfo("OK", "Especialidad agregada correctamente.")
+            win.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo agregar la especialidad:\n{e}")
+
+    tk.Button(frame, text="Guardar", bg="#3a7bd5", fg="white", command=guardar).grid(row=2, column=0, columnspan=2, pady=15)
+
+@requiere_admin
+def modificar_especialidad():
+    win = tk.Toplevel()
+    win.title("Modificar especialidad")
+    win.geometry("450x300")
+    win.resizable(False, False)
+
+    frame = ttk.Frame(win, padding=20)
+    frame.pack(fill="both", expand=True)
+
+    ttk.Label(frame, text="Buscar especialidad por ID o Nombre:").grid(row=0, column=0, sticky="w")
+    entry_buscar = tk.Entry(frame, width=35)
+    entry_buscar.grid(row=0, column=1, pady=5)
+
+    # Campos editables
+    ttk.Label(frame, text="Nuevo nombre:").grid(row=1, column=0, sticky="w")
+    entry_nombre = tk.Entry(frame, width=35)
+    entry_nombre.grid(row=1, column=1, pady=5)
+
+    ttk.Label(frame, text="Nueva descripción:").grid(row=2, column=0, sticky="w")
+    entry_desc = tk.Entry(frame, width=35)
+    entry_desc.grid(row=2, column=1, pady=5)
+
+    def buscar():
+        val = entry_buscar.get().strip()
+        if not val:
+            messagebox.showwarning("Falta dato", "Ingresa un ID o nombre de especialidad.")
+            return
+
+        try:
+            conn = get_conn()
+            c = conn.cursor()
+
+            # Buscar por ID o nombre
+            c.execute("""
+                SELECT id, nombre, descripcion
+                FROM especialidades
+                WHERE es_clave = %s OR es_nombre = %s
+            """, (val, val))
+
+            esp = c.fetchone()
+            conn.close()
+
+            if not esp:
+                messagebox.showerror("No encontrado", "No existe esa especialidad.")
                 return
 
-            if not messagebox.askyesno("Confirmar", f"¿Eliminar a '{usr.nombre}' (id={usr.id})?"):
-                return
+            win.esp_id = esp[0]
+            entry_nombre.delete(0, tk.END)
+            entry_nombre.insert(0, esp[1])
 
-            try:
-                conn = get_conn()
-                cur = conn.cursor()
+            entry_desc.delete(0, tk.END)
+            entry_desc.insert(0, esp[2] or "")
 
-                cur.execute("DELETE FROM usuarios WHERE us_clave=%s", (usr.id,))
-                conn.commit()
-                cur.close()
-                conn.close()
+            messagebox.showinfo("OK", "Especialidad cargada.")
 
-                messagebox.showinfo("OK", "Usuario eliminado correctamente.")
-                listar_usuarios()
-                win.destroy()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo buscar:\n{e}")
 
-            except Exception as e:
-                messagebox.showerror("Error", f"{e}")
+    def guardar():
+        if not hasattr(win, "esp_id"):
+            messagebox.showwarning("Falta búsqueda", "Primero busca una especialidad.")
+            return
 
-        tk.Button(
-            frame, text="Eliminar",
-            background="#ef5350", activebackground="#e57373",
-            foreground="white", font=("Arial", 8, "bold"),
-            relief="raised", bd=4,
-            command=eliminar
-        ).grid(row=1, column=0, columnspan=2, pady=20)
+        nuevo_nom = entry_nombre.get().strip()
+        nuevo_desc = entry_desc.get().strip()
+
+        if not nuevo_nom:
+            messagebox.showwarning("Falta nombre", "El nombre no puede quedar vacío.")
+            return
+
+        try:
+            conn = get_conn()
+            c = conn.cursor()
+            c.execute("""
+                UPDATE especialidades
+                SET es_nombre = %s
+                WHERE es_clave = %s
+            """, (nuevo_nom, nuevo_desc, win.esp_id))
+            conn.commit()
+            conn.close()
+
+            messagebox.showinfo("OK", "Especialidad modificada.")
+            win.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo modificar:\n{e}")
+
+    tk.Button(frame, text="Buscar", bg="#4caf50", fg="white", command=buscar).grid(row=3, column=0, columnspan=2, pady=5)
+    tk.Button(frame, text="Guardar cambios", bg="#3a7bd5", fg="white", command=guardar).grid(row=4, column=0, columnspan=2, pady=10)
+
+@requiere_admin
+def eliminar_especialidad():
+    win = tk.Toplevel()
+    win.title("Eliminar especialidad")
+    win.geometry("400x200")
+    win.resizable(False, False)
+
+    frame = ttk.Frame(win, padding=20)
+    frame.pack(fill="both", expand=True)
+
+    ttk.Label(frame, text="ID o Nombre de la especialidad a eliminar:").pack()
+    entry_val = tk.Entry(frame, width=35)
+    entry_val.pack(pady=10)
+
+    def eliminar():
+        val = entry_val.get().strip()
+        if not val:
+            messagebox.showwarning("Falta dato", "Ingresa un ID o un nombre.")
+            return
+
+        if not messagebox.askyesno("Confirmar", "¿Seguro que deseas eliminar esta especialidad?"):
+            return
+
+        try:
+            conn = get_conn()
+            c = conn.cursor()
+            c.execute("DELETE FROM especialidades WHERE es_clave = %s OR es_nombre = %s", (val, val))
+            conn.commit()
+            conn.close()
+
+            messagebox.showinfo("OK", "Especialidad eliminada.")
+            win.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo eliminar:\n{e}")
+
+    tk.Button(frame, text="Eliminar", bg="#ef5350", fg="white", command=eliminar).pack(pady=15)
+
+def mostrar_especialidades():
+    """Muestra todas las especialidades registradas en una tabla Tk."""
+    from tkinter import ttk
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT es_clave, es_nombre FROM especialidades ORDER BY es_clave")
+
+    filas = cur.fetchall()
+
+    # Ventana
+    win = tk.Toplevel()
+    win.title("Listado de Especialidades")
+    win.geometry("450x300")
+
+    # Tabla
+    tabla = ttk.Treeview(win, columns=("ID", "Nombre"), show="headings")
+    tabla.heading("ID", text="ID")
+    tabla.heading("Nombre", text="Nombre")
+    tabla.column("ID", width=60)
+    tabla.column("Nombre", width=300)
+    tabla.pack(fill="both", expand=True)
+
+    # Insertar datos
+    for fila in filas:
+        tabla.insert("", "end", values=fila)
+
+    cur.close()
+    conn.close()
 
 
 # --- Consultas / Consulta (antes 'libros' en tu código) ---
 
-@requiere_admin
 def registrar_consulta():
     """Registrar una nueva consulta/cita con su propia ventana GUI."""
     win = tk.Toplevel()
@@ -749,7 +972,6 @@ def registrar_consulta():
 
     return resultado["consulta"]
 
-@requiere_admin
 def modificar_consulta():
     win = tk.Toplevel()
     win.title("Modificar consulta")
@@ -857,7 +1079,6 @@ def modificar_consulta():
         command=guardar
     ).grid(row=3, column=0, columnspan=3, pady=20)
 
-@requiere_admin
 def eliminar_consulta():
     win = tk.Toplevel()
     win.title("Eliminar consulta")
@@ -932,8 +1153,8 @@ def listar_consultas():
             return
         lb_output.insert(tk.END, "Consultas:")
         for c in consultas:
-            status = "Disponible" if c.ci_motivo else "No disponible"
-            lb_output.insert(tk.END, f"  [{c.id}] {c.ci_especialidad} — {c.ci_fecha} ({status})")
+            status = "Disponible" if c.motivo else "No disponible"
+            lb_output.insert(tk.END, f"  [{c.id}] - ID del paciente: {c.paciente} - Fecha: {c.fecha} - Estado: ({status})")
     except Exception as e:
         messagebox.showerror("Error", f"Error al listar consultas:\n{e}")
 
@@ -968,6 +1189,37 @@ def salir():
     root.destroy()
     sys.exit(0)
 
+def ver_consultas_paciente():
+    """Muestra las consultas próximas del paciente conectado."""
+    if current_user is None or current_user.role.lower() != "paciente":
+        messagebox.showerror("Permisos", "Solo los pacientes pueden ver sus consultas.")
+        return
+
+    win = tk.Toplevel()
+    win.title("Mis próximas consultas")
+    win.geometry("600x400")
+
+    ttk.Label(win, text=f"Consultas próximas de: {current_user.nombre}",
+              font=("Arial", 12, "bold")).pack(pady=10)
+
+    tree = ttk.Treeview(win, columns=("fecha", "hora", "doctor"), show="headings", height=12)
+    tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+    tree.heading("fecha", text="Fecha")
+    tree.heading("hora", text="Hora")
+    tree.heading("doctor", text="Doctor")
+
+    # Obtener consultas desde la BD
+    consultas = ConsultaPaciente.obtener_por_paciente(current_user.id)
+
+    if not consultas:
+        messagebox.showinfo("Sin consultas", "No tienes consultas próximas.")
+        return
+
+    for c in consultas:
+        tree.insert("", "end", values=(c.fecha, c.hora, c.doctor))
+
+
 
 def ajustar_menu_por_rol():
     """Habilita/deshabilita opciones del menú según el rol del usuario actual."""
@@ -987,35 +1239,33 @@ def ajustar_menu_por_rol():
         acciones_menu.entryconfig("Registrar usuario", state="normal")
         acciones_menu.entryconfig("Modificar usuario", state="normal")
         acciones_menu.entryconfig("Eliminar usuario", state="normal")
-        acciones_menu.entryconfig("Registrar consulta", state="normal")
-        acciones_menu.entryconfig("Modificar consulta", state="normal")
-        acciones_menu.entryconfig("Eliminar consulta", state="normal")
+        acciones_menu.entryconfig("Registrar consulta", state="disabled")
+        acciones_menu.entryconfig("Modificar consulta", state="disabled")
+        acciones_menu.entryconfig("Eliminar consulta", state="disabled")
         acciones_menu.entryconfig("Mostrar usuarios", state="normal")
         acciones_menu.entryconfig("Mostrar consultas", state="normal")
-        acciones_menu.entryconfig("Consultas (usuario)", state="normal")
+        acciones_menu.entryconfig("Registrar especialidad", state="normal")
+        acciones_menu.entryconfig("Modificar especialidad", state="normal")
+        acciones_menu.entryconfig("Eliminar especialidad", state="normal")
+        acciones_menu.entryconfig("Mostrar especialidades", state="normal")    
     else:
         # doctor o paciente: permisos limitados
         acciones_menu.entryconfig("Registrar usuario", state="disabled")
         acciones_menu.entryconfig("Modificar usuario", state="disabled")
         acciones_menu.entryconfig("Eliminar usuario", state="disabled")
-        acciones_menu.entryconfig("Registrar consulta", state="disabled")
-        acciones_menu.entryconfig("Modificar consulta", state="disabled")
+        acciones_menu.entryconfig("Registrar consulta", state="normal")
+        acciones_menu.entryconfig("Modificar consulta", state="normal")
         acciones_menu.entryconfig("Eliminar consulta", state="disabled")
         # doctor puede agendar/cancelar y ver usuarios; paciente solo ver y agendar/cancelar sus consultas
         if (current_user.role or "").lower() == 'doctor':
-            acciones_menu.entryconfig("Agendar consulta", state="normal")
-            acciones_menu.entryconfig("Cancelar agenda", state="normal")
             acciones_menu.entryconfig("Mostrar usuarios", state="normal")
             acciones_menu.entryconfig("Mostrar consultas", state="normal")
-            acciones_menu.entryconfig("Consultas (usuario)", state="normal")
-        else:  # Paciente u otros
-            acciones_menu.entryconfig("Agendar consulta", state="normal")
-            acciones_menu.entryconfig("Cancelar agenda", state="normal")
+        if current_user.role.lower() == "paciente":
+            acciones_menu.entryconfig("Mis consultas", state="normal")
+            acciones_menu.entryconfig("Registrar consulta", state="disabled")
+            acciones_menu.entryconfig("Modificar consulta", state="disabled")
             acciones_menu.entryconfig("Mostrar usuarios", state="disabled")
-            acciones_menu.entryconfig("Mostrar consultas", state="normal")
-            acciones_menu.entryconfig("Consultas (usuario)", state="normal")
-
-
+            acciones_menu.entryconfig("Mostrar consultas", state="disabled")
 # --- Interfaz principal (ventana) ---
 root = tk.Tk()
 root.title("Nexus Care - Interfaz gráfica")
@@ -1031,6 +1281,11 @@ acciones_menu.add_command(label="Registrar usuario", command=registrar_usuario)
 acciones_menu.add_command(label="Modificar usuario", command=modificar_usuario)
 acciones_menu.add_command(label="Eliminar usuario", command=eliminar_usuario)
 acciones_menu.add_separator()
+acciones_menu.add_command(label="Registrar especialidad", command=agregar_especialidad)
+acciones_menu.add_command(label="Modificar especialidad", command=modificar_especialidad)
+acciones_menu.add_command(label="Eliminar especialidad", command=eliminar_especialidad)
+acciones_menu.add_command(label="Mostrar especialidades", command=mostrar_especialidades)
+acciones_menu.add_separator()
 acciones_menu.add_command(label="Registrar consulta", command=registrar_consulta)
 acciones_menu.add_command(label="Modificar consulta", command=modificar_consulta)
 acciones_menu.add_command(label="Eliminar consulta", command=eliminar_consulta)
@@ -1038,7 +1293,7 @@ acciones_menu.add_separator()
 acciones_menu.add_command(label="Mostrar usuarios", command=listar_usuarios)
 acciones_menu.add_command(label="Mostrar consultas", command=listar_consultas)
 acciones_menu.add_separator()
-acciones_menu.add_command(label="Consultas (usuario)", command=obtener_consultas_usuario)
+acciones_menu.add_command(label="Mis consultas", command=ver_consultas_paciente)
 menubar.add_cascade(label="Acciones", menu=acciones_menu)
 
 # Menú "Archivo" con Salir
