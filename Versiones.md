@@ -320,16 +320,21 @@ def registrar_usuario():
     entry_correo = tk.Entry(frame, highlightthickness=2, highlightbackground="#5F9BE0", highlightcolor="green", width=35)
     entry_correo.grid(row=2, column=1, padx=5, pady=5)
 
+    # Telefono
+    ttk.Label(frame, text="Numero de Teléfono:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+    entry_telefono = tk.Entry(frame, highlightthickness=2, highlightbackground="#5F9BE0", highlightcolor="green", width=35)
+    entry_telefono.grid(row=3, column=1, padx=5, pady=5)
+
     # Rol
-    ttk.Label(frame, text="Rol:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
+    ttk.Label(frame, text="Rol:").grid(row=4, column=0, sticky="w", padx=5, pady=5)
     cb_role = ttk.Combobox(frame, values=["Paciente", "Doctor", "Admin"], state="readonly", width=32)
-    cb_role.grid(row=3, column=1, padx=5, pady=5)
+    cb_role.grid(row=4, column=1, padx=5, pady=5)
     cb_role.set("Paciente")
 
     # Contraseña
-    ttk.Label(frame, text="Contraseña:").grid(row=4, column=0, sticky="w", padx=5, pady=5)
+    ttk.Label(frame, text="Contraseña:").grid(row=5, column=0, sticky="w", padx=5, pady=5)
     entry_pwd = tk.Entry(frame, highlightthickness=2, highlightbackground="#5F9BE0", highlightcolor="green", show="*", width=35)
-    entry_pwd.grid(row=4, column=1, padx=5, pady=5)
+    entry_pwd.grid(row=5, column=1, padx=5, pady=5)
 
     # ========== BOTONES ==========
     def guardar():
@@ -372,7 +377,7 @@ def registrar_usuario():
         win.destroy()
 
     btn_frame = ttk.Frame(frame)
-    btn_frame.grid(row=5, column=0, columnspan=2, pady=20)
+    btn_frame.grid(row=6, column=0, columnspan=2, pady=20)
 
     tk.Button(
         btn_frame, text="Registrar",
@@ -437,7 +442,7 @@ def modificar_usuario():
     entry_buscar.grid(row=0, column=1, padx=5, pady=5)
 
     # Campos editables
-    labels = ["Nombre", "Apellidos", "Correo", "Rol (Paciente/Doctor/Admin)", "Contraseña (opcional)"]
+    labels = ["Nombre", "Apellidos", "Correo", "Telefono", "Rol (Paciente/Doctor/Admin)", "Contraseña (opcional)"]
     entradas = {}
 
     for i, texto in enumerate(labels, start=1):
@@ -463,6 +468,7 @@ def modificar_usuario():
         entradas["Nombre"].delete(0, tk.END); entradas["Nombre"].insert(0, usr.nombre)
         entradas["Apellidos"].delete(0, tk.END); entradas["Apellidos"].insert(0, usr.apellidos)
         entradas["Correo"].delete(0, tk.END); entradas["Correo"].insert(0, usr.correo)
+        entradas["Telefono"].delete(0, tk.END); entradas["Telefono"].insert(0, usr.telefono)
         entradas["Rol (Paciente/Doctor/Admin)"].delete(0, tk.END); entradas["Rol (Paciente/Doctor/Admin)"].insert(0, usr.role)
         entradas["Contraseña (opcional)"].delete(0, tk.END)
 
@@ -486,6 +492,7 @@ def modificar_usuario():
         nuevo_nombre = entradas["Nombre"].get().strip()
         nuevo_apellidos = entradas["Apellidos"].get().strip()
         nuevo_correo = entradas["Correo"].get().strip()
+        nuevo_telefono = entradas["Teléfono"].get().strip()
         nuevo_role = entradas["Rol (Paciente/Doctor/Admin)"].get().strip()
         nueva_pwd = entradas["Contraseña (opcional)"].get().strip()
 
@@ -496,9 +503,9 @@ def modificar_usuario():
             if nueva_pwd:
                 cur.execute("""
                     UPDATE usuarios 
-                    SET us_nombre=%s, us_apellidos=%s, us_correo=%s, us_rol=%s, us_contrasena=%s
+                    SET us_nombre=%s, us_apellidos=%s, us_correo=%s, us_telefono=%s, us_rol=%s
                     WHERE us_clave=%s
-                """, (nuevo_nombre, nuevo_apellidos, nuevo_correo, nuevo_role, hash_password(nueva_pwd), usr.id))
+                """, (nuevo_nombre, nuevo_apellidos, nuevo_correo, nuevo_telefono, nuevo_role, hash_password(nueva_pwd), usr.id))
             else:
                 cur.execute("""
                     UPDATE usuarios 
@@ -611,14 +618,9 @@ def eliminar_usuario():
             win.destroy()
             listar_usuarios()
 
-        tk.Button(sel_win, text="Eliminar seleccionado", bg="#ef5350", fg="white",
-                  command=eliminar_seleccion).pack(pady=10)
-
-    tk.Button(frame, text="Buscar y eliminar por apellido", bg="#3a7bd5", fg="white",
-              command=buscar_apellidos).grid(row=3, column=1, pady=8, sticky="e")
-
-    tk.Button(win, text="Cerrar", bg="#999", fg="white",
-              command=win.destroy).pack(pady=10)
+        tk.Button(sel_win, text="Eliminar seleccionado", bg="#ef5350", fg="white", command=eliminar_seleccion).pack(pady=10)
+        tk.Button(frame, text="Buscar y eliminar por apellido", bg="#3a7bd5", fg="white", command=buscar_apellidos).grid(row=3, column=1, pady=8, sticky="e")
+        tk.Button(win, text="Cerrar", bg="#999", fg="white",command=win.destroy).pack(pady=10)
     
 
 @requiere_admin
@@ -816,6 +818,171 @@ def mostrar_especialidades():
     cur.close()
     conn.close()
 
+def registrar_doctor_especialidad():
+    win = tk.Toplevel()
+    win.title("Asignar Especialidad a Doctor")
+    win.geometry("430x260")
+
+    tk.Label(win, text="Seleccione al doctor:", font=("Arial", 10, "bold")).pack(pady=5)
+
+    cb_doctor = ttk.Combobox(win, state="readonly", width=40)
+    cb_doctor.pack(pady=5)
+
+    tk.Label(win, text="Seleccione la especialidad:", font=("Arial", 10, "bold")).pack(pady=5)
+
+    cb_esp = ttk.Combobox(win, state="readonly", width=40)
+    cb_esp.pack(pady=5)
+
+    # --- CARGAR DOCTORES ---
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT us_clave, us_nombre, us_apellidos
+            FROM usuarios
+            WHERE LOWER(us_rol) = 'doctor'
+        """)
+
+        doctores = cur.fetchall()
+
+        lista_doctores = [f"{d[0]} - {d[1]} {d[2]}" for d in doctores] if doctores else []
+        cb_doctor["values"] = lista_doctores
+
+        cur.close()
+        conn.close()
+
+        if not doctores:
+            cb_doctor["values"] = ["(No hay doctores registrados)"]
+            cb_doctor.current(0)
+            return
+
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudieron cargar doctores:\n{e}")
+        win.destroy()
+        return
+
+    # --- CARGAR ESPECIALIDADES ---
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        cur.execute("SELECT es_clave, es_nombre FROM especialidades")
+        especialidades = cur.fetchall()
+
+        lista_esps = [f"{e[0]} - {e[1]}" for e in especialidades] if especialidades else []
+        cb_esp["values"] = lista_esps
+
+        cur.close()
+        conn.close()
+
+        if not especialidades:
+            cb_esp["values"] = ["(No hay especialidades registradas)"]
+            cb_esp.current(0)
+            return
+
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudieron cargar especialidades:\n{e}")
+        win.destroy()
+        return
+
+    # --- GUARDAR ASIGNACIÓN ---
+    def guardar():
+        d_sel = cb_doctor.get()
+        e_sel = cb_esp.get()
+
+        if not d_sel or not e_sel:
+            messagebox.showwarning("Error", "Seleccione doctor y especialidad.")
+            return
+
+        try:
+            doctor_id = int(d_sel.split(" - ")[0])
+            esp_id = int(e_sel.split(" - ")[0])
+        except:
+            messagebox.showwarning("Error", "Selección inválida.")
+            return
+
+        try:
+            conn = get_conn()
+            cur = conn.cursor()
+
+            # Verificar si ya existe la asignación
+            cur.execute("""
+                SELECT * FROM doctores_especialidades
+                WHERE us_clave = %s AND es_clave = %s
+            """, (doctor_id, esp_id))
+
+            if cur.fetchone():
+                messagebox.showinfo("Aviso", "Este doctor ya tiene esa especialidad.")
+                cur.close()
+                conn.close()
+                return
+
+            # Insertar relación
+            cur.execute("""
+                INSERT INTO doctores_especialidades (us_clave, es_clave)
+                VALUES (%s, %s)
+            """, (doctor_id, esp_id))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            messagebox.showinfo("OK", "Especialidad asignada correctamente.")
+            win.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo asignar la especialidad:\n{e}")
+
+    tk.Button(win, text="Asignar especialidad", font=("Arial", 10), command=guardar).pack(pady=15)
+
+def mostrar_doctores_por_especialidad():
+    try:
+        conn = get_conn()
+        cursor = conn.cursor(dictionary=True)
+
+        query = """
+        SELECT 
+            e.es_clave AS id_especialidad,
+            e.es_nombre AS especialidad,
+            u.us_clave AS id_doctor,
+            u.us_nombre AS nombre_doctor,
+            u.us_apellidos AS apellidos_doctor
+        FROM especialidades e
+        LEFT JOIN doctores_especialidades de ON e.es_clave = de.es_clave
+        LEFT JOIN usuarios u ON de.us_clave = u.us_clave
+        ORDER BY e.es_nombre ASC, u.us_apellidos ASC;
+        """
+
+        cursor.execute(query)
+        resultados = cursor.fetchall()
+
+        lb_output.delete(0, tk.END)
+
+        if not resultados:
+            lb_output.insert(tk.END, "No hay especialidades registradas.")
+            return
+
+        especialidad_actual = None
+
+        for fila in resultados:
+            if fila["especialidad"] != especialidad_actual:
+                especialidad_actual = fila["especialidad"]
+                lb_output.insert(tk.END, "")
+                lb_output.insert(tk.END, f"Especialidad: {especialidad_actual}")
+                lb_output.insert(tk.END, "----------------------------------------")
+
+            if fila["id_doctor"] is None:
+                lb_output.insert(tk.END, "   (Sin doctores asignados)")
+            else:
+                lb_output.insert(
+                    tk.END,
+                    f"   • {fila['nombre_doctor']} {fila['apellidos_doctor']} (ID: {fila['id_doctor']})"
+                )
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Ocurrió un error al consultar:\n{e}")
+
 
 # --- Consultas / Consulta (antes 'libros' en tu código) ---
 
@@ -868,23 +1035,14 @@ def registrar_consulta():
     entry_fecha = tk.Entry(frame, width=35)
     entry_fecha.grid(row=3, column=1, padx=5, pady=5)
 
-    ttk.Label(frame, text="¿Es virtual? (0/1):").grid(row=4, column=0, sticky="w", pady=5)
-    cb_virtual = ttk.Combobox(frame, values=["0", "1"], state="readonly", width=32)
-    cb_virtual.grid(row=4, column=1, padx=5, pady=5)
-    cb_virtual.set("0")
-
-    ttk.Label(frame, text="¿Es presencial? (0/1):").grid(row=5, column=0, sticky="w", pady=5)
-    cb_presencial = ttk.Combobox(frame, values=["0", "1"], state="readonly", width=32)
-    cb_presencial.grid(row=5, column=1, padx=5, pady=5)
-    cb_presencial.set("1")
+    ttk.Label(frame, text="Tipo de Consulta: ").grid(row=4, column=0, sticky="w", pady=5)
+    tipo_consulta = ttk.Combobox(frame, values=["Virtual", "Presencial"], state="readonly", width=32)
+    tipo_consulta.grid(row=4, column=1, padx=5, pady=5)
+    tipo_consulta.set("Virtual")
 
     ttk.Label(frame, text="ID Paciente:").grid(row=6, column=0, sticky="w", pady=5)
     entry_paciente = tk.Entry(frame, width=35)
     entry_paciente.grid(row=6, column=1, padx=5, pady=5)
-
-    ttk.Label(frame, text="ID Doctor:").grid(row=7, column=0, sticky="w", pady=5)
-    entry_doctor = tk.Entry(frame, width=35)
-    entry_doctor.grid(row=7, column=1, padx=5, pady=5)
 
     # ========== Funciones ==========
     def guardar():
@@ -893,7 +1051,6 @@ def registrar_consulta():
         hora = entry_hora.get().strip()
         fecha = entry_fecha.get().strip()
         paciente = entry_paciente.get().strip()
-        doctor = entry_doctor.get().strip()
 
         # Validaciones simples
         if not diagnostico:
@@ -912,17 +1069,16 @@ def registrar_consulta():
             messagebox.showwarning("Paciente inválido", "El ID de paciente debe ser numérico.")
             return
 
-        if not doctor.isdigit():
-            messagebox.showwarning("Doctor inválido", "El ID de doctor debe ser numérico.")
+        if current_user is None or current_user.role.lower() != "doctor":
+            messagebox.showerror("Error", "Solo los doctores pueden registrar consultas.")
             return
 
-        virtual = int(cb_virtual.get())
-        presencial = int(cb_presencial.get())
-
+        doctor = current_user.id
+        virtual = str(tipo_consulta.get())
         try:
             c = Consulta.crear(
                 diagnostico, motivo, hora, fecha,
-                virtual, presencial, int(paciente), int(doctor)
+                virtual, int(paciente), doctor
             )
             resultado["consulta"] = c
 
@@ -1145,20 +1301,35 @@ def listar_usuarios():
 
 
 def listar_consultas():
+    lb_output.delete(0, tk.END)
+
+    # PACIENTE — solo ve sus consultas
+    if current_user and current_user.role.lower() == "paciente":
+        consultas = Consulta.listar_por_paciente(current_user.id)
+
+        if not consultas:
+            lb_output.insert(tk.END, "No tienes consultas registradas.")
+            return
+        
+        lb_output.insert(tk.END, f"Consultas del paciente {current_user.nombre}:\n")
+        for c in consultas:
+            lb_output.insert(tk.END, f"[{c.id}] Fecha: {c.fecha}  Motivo: {c.motivo}")
+        return
+
+    # ADMIN o DOCTOR — ven todas
     try:
         consultas = Consulta.listar_todos()
-        lb_output.delete(0, tk.END)
         if not consultas:
             lb_output.insert(tk.END, "No hay consultas registradas.")
             return
-        lb_output.insert(tk.END, "Consultas:")
+
+        lb_output.insert(tk.END, "Consultas (todas):")
         for c in consultas:
-            status = "Disponible" if c.motivo else "No disponible"
-            lb_output.insert(tk.END, f"  [{c.id}] - ID del paciente: {c.paciente} - Fecha: {c.fecha} - Estado: ({status})")
+            lb_output.insert(tk.END, f"[{c.id}] Paciente: {c.paciente} - Fecha: {c.fecha} - Motivo: {c.motivo}")
+
     except Exception as e:
         messagebox.showerror("Error", f"Error al listar consultas:\n{e}")
-
-
+        
 def obtener_consultas_usuario():
     nombre = simpledialog.askstring("Consultas agendadas", "Nombre del usuario:")
     if not nombre:
@@ -1196,7 +1367,7 @@ def ver_consultas_paciente():
         return
 
     win = tk.Toplevel()
-    win.title("Mis próximas consultas")
+    win.title("Mis consultas")
     win.geometry("600x400")
 
     ttk.Label(win, text=f"Consultas próximas de: {current_user.nombre}",
@@ -1285,6 +1456,8 @@ acciones_menu.add_command(label="Registrar especialidad", command=agregar_especi
 acciones_menu.add_command(label="Modificar especialidad", command=modificar_especialidad)
 acciones_menu.add_command(label="Eliminar especialidad", command=eliminar_especialidad)
 acciones_menu.add_command(label="Mostrar especialidades", command=mostrar_especialidades)
+acciones_menu.add_command(label="Asignar especialidad a doctor", command=registrar_doctor_especialidad)
+acciones_menu.add_command(label="Mostrar Doctores en Especialidades", command=mostrar_doctores_por_especialidad)
 acciones_menu.add_separator()
 acciones_menu.add_command(label="Registrar consulta", command=registrar_consulta)
 acciones_menu.add_command(label="Modificar consulta", command=modificar_consulta)
