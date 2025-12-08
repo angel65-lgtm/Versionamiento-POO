@@ -78,7 +78,7 @@ def login_inicial():
             resultado["user"] = nuevo
 
     def cancelar():
-        win.destroy()
+        root.destroy()
 
     # Botones
     btn_frame = ttk.Frame(frame)
@@ -1314,14 +1314,35 @@ def eliminar_consulta():
 
 def listar_usuarios():
     try:
-        usuarios = Usuario.listar_todos()
+        conn = get_conn()
+        cur = conn.cursor()
+
+        # Si el usuario conectado es doctor → solo pacientes
+        if current_user.role.lower() == "doctor":
+            cur.execute("""
+                SELECT us_clave, us_nombre, us_apellidos, us_correo, us_telefono, us_rol
+                FROM usuarios
+                WHERE us_rol = 'Paciente'
+            """)
+        else:
+            # Admin y otros ven todo
+            cur.execute("""
+                SELECT us_clave, us_nombre, us_apellidos, us_correo, us_telefono, us_rol
+                FROM usuarios
+            """)
+
+        usuarios = cur.fetchall()
+        cur.close()
+        conn.close()
+
         lb_output.delete(0, tk.END)
-        if not usuarios:
-            lb_output.insert(tk.END, "No hay usuarios registrados.")
-            return
         lb_output.insert(tk.END, "Usuarios:")
+
         for u in usuarios:
-            lb_output.insert(tk.END, f"  [{u.id}] {u.nombre} {u.apellidos} — {u.role}")
+            uid, nombre, apellidos, correo, telefono, rol = u
+            lb_output.insert(tk.END, "")
+            lb_output.insert(tk.END, f"[{uid}] {nombre} {apellidos} — {rol} —  {correo} — {telefono}")
+
     except Exception as e:
         messagebox.showerror("Error", f"Error al listar usuarios:\n{e}")
 
@@ -1402,6 +1423,33 @@ def ver_consultas_paciente():
     for c in consultas:
         tree.insert("", "end", values=(c.fecha, c.hora, c.doctor))
 
+@requiere_admin
+def grafica_roles_usuarios():
+    import matplotlib.pyplot as plt
+    from usuarios import Usuario
+
+    # Obtener todos los usuarios desde la BD
+    lista = Usuario.listar_todos()
+
+    # Contadores por rol
+    roles = {"Paciente": 0, "Doctor": 0, "Admin": 0}
+
+    for u in lista:
+        rol = (u.role or "").capitalize()
+        if rol in roles:
+            roles[rol] += 1
+
+    # Crear gráfica
+    plt.figure(figsize=(6, 4))
+    plt.bar(roles.keys(), roles.values())
+    plt.title("Cantidad de usuarios por rol")
+    plt.xlabel("Roles")
+    plt.ylabel("Cantidad")
+    plt.grid(axis="y", linestyle="--", alpha=0.6)
+
+    plt.show()
+
+
 
 
 def ajustar_menu_por_rol():
@@ -1416,6 +1464,11 @@ def ajustar_menu_por_rol():
         acciones_menu.entryconfig("Cancelar agenda", state="disabled")
         acciones_menu.entryconfig("Consultas (usuario)", state="disabled")
         return
+
+    if (current_user.role or "").lower() == 'admin':
+        acciones_menu.entryconfig("Gráfica de usuarios por rol", state="normal")
+    else:
+        acciones_menu.entryconfig("Gráfica de usuarios por rol", state="disabled")
 
     if (current_user.role or "").lower() == 'admin':
         # Admin: habilitar todo
@@ -1441,7 +1494,7 @@ def ajustar_menu_por_rol():
         acciones_menu.entryconfig("Eliminar consulta", state="disabled")
         # doctor puede agendar/cancelar y ver usuarios; paciente solo ver y agendar/cancelar sus consultas
         if (current_user.role or "").lower() == 'doctor':
-            acciones_menu.entryconfig("Mostrar usuarios", state="disabled")
+            acciones_menu.entryconfig("Mostrar usuarios", state="normal")
             acciones_menu.entryconfig("Mostrar consultas", state="normal")
             acciones_menu.entryconfig("Eliminar consulta", state="normal")
             acciones_menu.entryconfig("Registrar especialidad", state="disabled")
@@ -1450,12 +1503,19 @@ def ajustar_menu_por_rol():
             acciones_menu.entryconfig("Mostrar especialidades", state="disabled") 
             acciones_menu.entryconfig("Asignar especialidad a doctor", state="disabled")
             acciones_menu.entryconfig("Mostrar Doctores en Especialidades", state="disabled") 
+            acciones_menu.entryconfig("Mis consultas", state="disabled")
         if current_user.role.lower() == "paciente":
             acciones_menu.entryconfig("Mis consultas", state="normal")
             acciones_menu.entryconfig("Registrar consulta", state="disabled")
             acciones_menu.entryconfig("Modificar consulta", state="disabled")
             acciones_menu.entryconfig("Mostrar usuarios", state="disabled")
             acciones_menu.entryconfig("Mostrar consultas", state="disabled")
+            acciones_menu.entryconfig("Registrar especialidad", state="disabled")
+            acciones_menu.entryconfig("Modificar especialidad", state="disabled")
+            acciones_menu.entryconfig("Eliminar especialidad", state="disabled")
+            acciones_menu.entryconfig("Mostrar especialidades", state="disabled") 
+            acciones_menu.entryconfig("Asignar especialidad a doctor", state="disabled")
+            acciones_menu.entryconfig("Mostrar Doctores en Especialidades", state="disabled")
 # --- Interfaz principal (ventana) ---
 root = tk.Tk()
 root.title("Nexus Care - Interfaz gráfica")
@@ -1486,6 +1546,8 @@ acciones_menu.add_command(label="Mostrar usuarios", command=listar_usuarios)
 acciones_menu.add_command(label="Mostrar consultas", command=listar_consultas)
 acciones_menu.add_separator()
 acciones_menu.add_command(label="Mis consultas", command=ver_consultas_paciente)
+acciones_menu.add_separator()
+acciones_menu.add_command(label="Gráfica de usuarios por rol",command=grafica_roles_usuarios)
 menubar.add_cascade(label="Acciones", menu=acciones_menu)
 
 # Menú "Archivo" con Salir
