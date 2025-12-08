@@ -62,33 +62,3 @@ class Consulta:
         finally:
             cur.close()
             conn.close()
-
-class ConsultaPaciente:
-    def __init__(self, fecha, hora, doctor):
-        self.fecha = fecha
-        self.hora = hora
-        self.doctor = doctor
-
-
-    @staticmethod
-    def obtener_por_paciente(id_paciente):
-        conn = get_conn()
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT co_fecha, co_hora, us_nombre
-            FROM consultas c
-            JOIN usuarios u ON us_clave = doctor_clave
-            WHERE paciente_clave = %s
-            ORDER BY co_fecha, co_hora
-        """, (id_paciente,))
-
-        rows = cur.fetchall()
-        conn.close()
-
-        resultado = []
-        for fecha, hora, doctor in rows:
-            obj = ConsultaPaciente(fecha, hora, doctor)
-            resultado.append(obj)
-
-        return resultado
